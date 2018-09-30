@@ -8,7 +8,7 @@
 #define MAXPENDING 5 /* Maximum outstanding connection requests */
 
 void DieWithError(char *errorMessage); /* Error handling function */
-void HandleTCPClient(int clntSocket); /* TCP client handling function */
+int HandleTCPClient(int clntSocket); /* TCP client handling function */
 
 int main(int argc, char *argv[])
 {
@@ -32,10 +32,14 @@ int main(int argc, char *argv[])
         DieWithError( "socket () failed") ;
 
     /* Construct local address structure */
-    memset(&echoServAddr, 0, sizeof(echoServAddr)); /* Zero out structure */
+    memset(&echoServAddr, 0, sizeof("127.0.0.1")); /* Zero out structure */
     echoServAddr.sin_family = AF_INET; /* Internet address family */
     echoServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    echoServAddr.sin_port = htons(echoServPort); /* Local port */
+    echoServAddr.sin_port = htons(8080); /* Local port */
+
+    int opt = 1;
+     if (setsockopt(servSock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt))<0) {perror("setsockopt");exit(EXIT_FAILURE);}if(setsockopt(servSock, SOL_SOCKET, SO_REUSEPORT, (char *)&opt, sizeof(opt))<0)   {
+               perror("setsockopt");exit(EXIT_FAILURE);}
 
     /* Bind to the local address */
     if (bind(servSock, (struct sockaddr *)&echoServAddr, sizeof(echoServAddr)) < 0)
@@ -53,6 +57,7 @@ int main(int argc, char *argv[])
         /* clntSock is connected to a client! */
         printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
         HandleTCPClient (clntSock);
+        close(clntSock); /* Close client socket */
     }
 /* NOT REACHED */
 }
