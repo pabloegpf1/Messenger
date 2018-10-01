@@ -57,25 +57,26 @@ int connectToServer(){
   echoServPort = strtol(port,&end,0);
   printf("Connecting.....\n");
 
-  /* Create a reliable, stream socket using TCP*/
-  if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-    DieWithError(" socket () failed");
-
-  /* Construct the server address structure*/
-  memset(&echoServAddr, 0, sizeof(echoServAddr));     /* Zero out structure */
-  echoServAddr.sin_family = AF_INET;                  /* Internet address family */
-  echoServAddr.sin_addr.s_addr = inet_addr(ipAdress); /* Server IP address */
-  echoServAddr.sin_port = htons(echoServPort);                /* Server port */
-
-  /* Establish the connection to the echo server */
-  if (connect(sock, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) < 0)
-    DieWithError(" connect () failed");
-
   if(online == -1){
+    /* Create a reliable, stream socket using TCP*/
+    if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+      DieWithError(" socket () failed");
+
+    /* Construct the server address structure*/
+    memset(&echoServAddr, 0, sizeof(echoServAddr));     /* Zero out structure */
+    echoServAddr.sin_family = AF_INET;                  /* Internet address family */
+    echoServAddr.sin_addr.s_addr = inet_addr(ipAdress); /* Server IP address */
+    echoServAddr.sin_port = htons(echoServPort);                /* Server port */
+
+    /* Establish the connection to the echo server */
+    if (connect(sock, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) < 0)
+      DieWithError(" connect () failed");
+    online = 1;
+  }
+
     /* Send the string to the server */
   if (send(sock, "0", sizeof("0"), 0) != sizeof("0"))
     DieWithError("Error sending option");
-  }
 
   printf("Connected!\nWelcome,Please Log In:\n");
   printf("Username: ");
@@ -95,10 +96,6 @@ int connectToServer(){
 int determineOption(int option){
   switch(option) {
     case 0  :
-      if(online == 1){
-        if (send(sock, "0", sizeof("0"), 0) != sizeof("0"))
-          DieWithError("Error sending option");
-      }
       connectToServer();
       break;
     case 1  :

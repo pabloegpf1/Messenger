@@ -1,6 +1,8 @@
 #include <stdio.h> /* for printf() and fprintf() */
 #include <sys/socket.h> /* for recv() and send() */
 #include <unistd.h> /* for close() */
+#include <string.h>
+
 #define RCVBUFSIZE 32 /* Size of receive buffer */
 void DieWithError(char *errorMessage); /* Error handling function */
 const char username;
@@ -12,31 +14,34 @@ int clntSocket;
 char echoBuffer[RCVBUFSIZE]; /* Buffer for echo string */
 int recvMsgSize; /* Size of received message */
 char *endptr;
-int online;
+int online = 0;
+int actualUserIndex;
 
 int determineOption(int option);
 
 struct User{
-   char username[30];
-   char password[30];
+   char* username;
+   char* password;
 };
 
 struct User user[5];
 
+void disconnect(){
+  online = 0;
+}
+
 int HandleTCPClient(int socket){
 
   clntSocket = socket;
-  online = -1;
 
   while(1){
 
-    /* Receive message from client */
-    if ((recvMsgSize = recv(clntSocket, echoBuffer, RCVBUFSIZE, 0)) < 0)
-        DieWithError("recv() failed") ;
+      /* Receive message from client */
+      if ((recvMsgSize = recv(clntSocket, echoBuffer, RCVBUFSIZE, 0)) < 0)
+          DieWithError("recv() failed") ;
 
-    if(determineOption(strtol(echoBuffer, &endptr,10)) == -1){
-      return 1;
-    }
+      if(determineOption(strtol(echoBuffer, &endptr,10)) == -1)
+        DieWithError("Incorrect option") ;
   }
 
   return 0;
@@ -45,27 +50,29 @@ int HandleTCPClient(int socket){
 int login(){
 
   printf("Logging in...\n");
+  memset(echoBuffer, '\0', sizeof(echoBuffer)*sizeof(char));
+
   /* Receive message from client */
-  if ((recvMsgSize = recv(clntSocket, echoBuffer, RCVBUFSIZE, 0)) < 0)
+  if ((recvMsgSize = recv(clntSocket, echoBuffer, sizeof(echoBuffer), 0)) < 0)
       DieWithError("recv() failed") ;
 
-  for(int i=0; i<userCount;i++){
-    if(strncmp(user[i].username,echoBuffer,RCVBUFSIZE) == 0){
+  for(int i=0; i<userCount; i++){
+    if(strcmp(user[i].username,echoBuffer) == 0){
       printf("%s\n",user[i].username);
       printf("\nUser found\n",echoBuffer);
       found = i;
+      actualUserIndex = i;
     }
   }
 
-  if(found != -1 || userCount == 0){
-    if(found == -1)
-      found = 0;
-    strcpy(user[found].username,echoBuffer);
-    printf("\nUser %d created: %s\n", found, user[found].username);
+  if(found == -1 || userCount == 0){
+    user[userCount].username = (char *)malloc( strlen(echoBuffer) + 1 );
+    strcpy(user[userCount].username,echoBuffer);
+    printf("User %d created: %s\n", userCount, user[userCount].username);
     userCount++;
+    actualUserIndex = userCount;
   }
 
-  online = 1;
   found = -1;
   return 0;
 }
@@ -81,6 +88,9 @@ int getUserList(){
 
 int determineOption(int option){
   switch(option) {
+    case 0:
+      login();
+      break;
     case 1  :
       getUserList();
       break;
@@ -96,13 +106,6 @@ int determineOption(int option){
     case 5  :
       printf("Option 5\n");
       DieWithError("Server closed") ;
-      break;
-    default:
-    printf("online %d\n", online);
-      if(online == 1)
-        return -1;
-      login();
-      online = 1;
       break;
   }return 0;
 }
