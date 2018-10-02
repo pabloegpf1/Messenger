@@ -93,6 +93,27 @@ int connectToServer(){
     return 0;
   }
 
+int sendMessage(){
+
+  /* Send the string to the server */
+  if (send(sock, "2", sizeof("2"), 0) != sizeof("2"))
+    DieWithError("Error sending option");
+
+  printf("Send message to: ");
+  fscanf(stdin,"%s",&echoBuffer);
+
+  if (send(sock, echoBuffer, strlen(echoBuffer), 0) != strlen(echoBuffer))
+    DieWithError("User not found");
+
+  printf("Message: ");
+  fscanf(stdin,"%s",&echoBuffer);
+
+  if (send(sock, echoBuffer, strlen(echoBuffer), 0) != strlen(echoBuffer))
+    DieWithError("Error sending message");
+
+  return 0;
+}
+
 int determineOption(int option){
   switch(option) {
     case 0  :
@@ -103,10 +124,11 @@ int determineOption(int option){
         DieWithError("Error sending option");
       break;
     case 2  :
-      printf("Option 2\n");
+      sendMessage();
       break;
     case 3  :
-      printf("Option 3\n");
+      if (send(sock, "3", sizeof("3"), 0) != sizeof("3"))
+        DieWithError("Error sending option");
       break;
     case 4  :
       printf("Option 4\n");

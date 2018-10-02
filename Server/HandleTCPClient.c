@@ -18,10 +18,15 @@ int online = 0;
 int actualUserIndex;
 
 int determineOption(int option);
+int push(struct message** head_ref, void *new_data, size_t data_size);
+int printList(struct message*node, void (*fptr)(void *));
+int printMessage(void *n);
 
 struct User{
    char* username;
    char* password;
+   const char *messages[10];
+   int messageCount;
 };
 
 struct User user[5];
@@ -58,8 +63,7 @@ int login(){
 
   for(int i=0; i<userCount; i++){
     if(strcmp(user[i].username,echoBuffer) == 0){
-      printf("%s\n",user[i].username);
-      printf("\nUser found\n",echoBuffer);
+      printf("User found\n",echoBuffer);
       found = i;
       actualUserIndex = i;
     }
@@ -70,7 +74,7 @@ int login(){
     strcpy(user[userCount].username,echoBuffer);
     printf("User %d created: %s\n", userCount, user[userCount].username);
     userCount++;
-    actualUserIndex = userCount;
+    actualUserIndex = userCount-1;
   }
 
   found = -1;
@@ -78,13 +82,59 @@ int login(){
 }
 
 int getUserList(){
-  printf("UserList: (%d)\n", userCount);
+  printf("-------UserList(%d)-------\n", userCount);
   for(int i=0; i<userCount;i++){
     printf("%s\n",user[i].username);
   }
-
+  printf("--------------------------\n", userCount);
   return 0;
 }
+
+int sendMessage(){
+
+  memset(echoBuffer, '\0', sizeof(echoBuffer)*sizeof(char));
+  /* Receive message from client */
+  if ((recvMsgSize = recv(clntSocket, echoBuffer, RCVBUFSIZE, 0)) < 0)
+      DieWithError("recv() failed") ;
+
+  for(int i=0; i<userCount; i++){
+    if(strcmp(user[i].username,echoBuffer) == 0){
+      printf("Sending message to: %s\n",echoBuffer);
+      found = i;
+    }
+  }
+
+  if(found == -1){
+    user[userCount].username = (char *)malloc( strlen(echoBuffer) + 1 );
+    strcpy(user[userCount].username,echoBuffer);
+    printf("Sending message to new user (%d) %s\n", userCount, user[userCount].username);
+    found = userCount;
+    userCount++;
+  }
+
+  memset(echoBuffer, '\0', sizeof(echoBuffer)*sizeof(char));
+  /* Receive message from client */
+  if ((recvMsgSize = recv(clntSocket, echoBuffer, RCVBUFSIZE, 0)) < 0)
+      DieWithError("recv() failed") ;
+
+  printf("(Test) Sending to: %s message: %s\n",user[found].username,echoBuffer);
+
+  user[found].messages[user[found].messageCount] = malloc(strlen(echoBuffer) + 1);
+  strcpy(user[found].messages[user[found].messageCount],echoBuffer);
+
+  user[found].messageCount++;
+  found = -1;
+  return 0;
+}
+
+int getMessages(){
+  printf("Messages for %s:\n", user[actualUserIndex].username);
+  for(int i = 0; i<user[actualUserIndex].messageCount; i++){
+    printf("%s\n", user[actualUserIndex].messages[i]);
+  }
+  return 0;
+}
+
 
 int determineOption(int option){
   switch(option) {
@@ -95,10 +145,10 @@ int determineOption(int option){
       getUserList();
       break;
     case 2  :
-      printf("Option 2\n");
+      sendMessage();
       break;
     case 3  :
-      printf("Option 3\n");
+      getMessages();
       break;
     case 4  :
       printf("Option 4\n");
