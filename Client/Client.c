@@ -11,7 +11,7 @@
 int sock;                    /* Socket descriptor */
 char *echoString;            /* String to send to echo server */
 char echoBuffer[RCVBUFSIZE]; /* Buffer for echo string */
-char echoSend[RCVBUFSIZE];
+char echoSend[100];
 unsigned int echoStringLen;    /* Length of string to echo */
 int bytesRcvd, totalBytesRcvd; /* Bytes read in single recv() and total bytes read */
 int recvMsgSize;               /* Size of received message */
@@ -79,6 +79,12 @@ int connectToServer() {
         echoServAddr.sin_addr.s_addr = inet_addr(ipAdress); /* Server IP address */
         echoServAddr.sin_port = htons(echoServPort);        /* Server port */
 
+        int opt = 1;
+        if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0) {
+            perror("setsockopt");
+            exit(EXIT_FAILURE);
+        }
+
         /* Establish the connection to the echo server */
         if (connect(sock, (struct sockaddr *)&echoServAddr, sizeof(echoServAddr)) < 0)
             DieWithError(" connect () failed");
@@ -134,17 +140,18 @@ int getUserList() {
 
     userCount = atoi(echoBuffer);
 
-    printf("-------UserList(%d)-------\n", userCount);
-    for (int i = 0; i < userCount; i++) {
-        memset(echoBuffer, '\0', sizeof(echoBuffer) * sizeof(char));
-        if ((recvMsgSize = recv(sock, echoBuffer, sizeof(echoBuffer), 0)) < 0)
-            DieWithError("recv() failed");
-        printf("%s\n", echoBuffer);
-    }
+    memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
+    printf("\n-------UserList(%d)-------\n", userCount);
+
+    if ((recvMsgSize = recv(sock, echoSend, sizeof(echoSend), 0)) < 0)
+        DieWithError("recv() failed");
+    printf("%s", echoSend);
+
     return 0;
 }
 
 int startChat() {
+    close(sock);
     printf("\n------------------Disconnected from server------------------\n");
     printf("Please enter the port number you want to listen on: ");
     fscanf(stdin, "%s", &echoBuffer);
@@ -157,7 +164,7 @@ int startChat() {
     memset(&echoServAddr, 0, sizeof("127.0.0.1"));    /* Zero out structure */
     echoServAddr.sin_family = AF_INET;                /* Internet address family */
     echoServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    echoServAddr.sin_port = htons(8080);              /* Local port */
+    echoServAddr.sin_port = htons(echoServPort);      /* Local port */
 
     int opt = 1;
     if (setsockopt(servSock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0) {
@@ -186,14 +193,18 @@ int startChat() {
             /* Receive message from client */
             if ((recvMsgSize = recv(clntSock, echoBuffer, RCVBUFSIZE, 0)) < 0)
                 DieWithError("recv() failed");
-            printf(">%s\n", echoBuffer);
+            printf("%s\n", echoBuffer);
 
             if (strcmp(echoBuffer, "Bye") == 0)
                 break;
 
+            printf("%s: ", username);
             scanf(" %[^\n]%*c", echoBuffer);
+            strcat(echoSend, username);
+            strcat(echoSend, ": ");
+            strcat(echoSend, echoBuffer);
             /* Send the string to the server */
-            if (send(clntSock, echoBuffer, sizeof(echoBuffer), 0) != sizeof(echoBuffer))
+            if (send(clntSock, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
                 DieWithError("Error sending option");
         }
     }
@@ -213,30 +224,30 @@ int connectToChat() {
     printf("Please enter the Port Number: ");
     fscanf(stdin, "%s", port);
     echoServPort = strtol(port, &end, 0);
-    printf("Connecting.....\n");
+    printf("Connecting your friend.....\n");
 
     /* Create a reliable, stream socket using TCP*/
     if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         DieWithError(" socket () failed");
-    printf("TCP.....\n");
 
     /* Construct the server address structure*/
     memset(&echoServAddr, 0, sizeof(echoServAddr));     /* Zero out structure */
     echoServAddr.sin_family = AF_INET;                  /* Internet address family */
     echoServAddr.sin_addr.s_addr = inet_addr(ipAdress); /* Server IP address */
     echoServAddr.sin_port = htons(echoServPort);        /* Server port */
-    printf("structure.....\n");
 
     /* Establish the connection to the echo server */
     if (connect(sock, (struct sockaddr *)&echoServAddr, sizeof(echoServAddr)) < 0)
         DieWithError(" connect () failed");
-    printf("connected.....\n");
+    printf("Connected!.....\n");
 
     while (1) {
+        memset(&echoSend, 0, sizeof(echoSend)); /* Zero out structure */
         /* Send the string to the server */
-        printf("%s:", username);
+        printf("%s: ", username);
         scanf(" %[^\n]%*c", echoBuffer);
         strcat(echoSend, username);
+        strcat(echoSend, ": ");
         strcat(echoSend, echoBuffer);
         if (send(sock, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
             DieWithError("Error sending message");
@@ -244,11 +255,13 @@ int connectToChat() {
         if (strcmp(echoBuffer, "Bye") == 0)
             break;
 
+        memset(echoBuffer, '\0', sizeof(echoBuffer) * sizeof(char));
+
         /* Receive message from client */
         if ((recvMsgSize = recv(sock, echoBuffer, RCVBUFSIZE, 0)) < 0)
             DieWithError("recv() failed");
 
-        printf(">%s\n", echoBuffer);
+        printf("%s\n", echoBuffer);
     }
 
     return 0;

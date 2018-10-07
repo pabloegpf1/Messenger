@@ -12,7 +12,8 @@ int found = -1;
 int userCount = 0;
 int clntSocket;
 char echoBuffer[RCVBUFSIZE]; /* Buffer for echo string */
-int recvMsgSize;             /* Size of received message */
+char echoSend[100];
+int recvMsgSize; /* Size of received message */
 char *endptr;
 int online = 0;
 int actualUserIndex;
@@ -40,8 +41,9 @@ int HandleTCPClient(int socket) {
         if ((recvMsgSize = recv(clntSocket, echoBuffer, RCVBUFSIZE, 0)) < 0)
             DieWithError("recv() failed");
 
-        if (determineOption(strtol(echoBuffer, &endptr, 10)) == -1)
-            return 0;
+        if (determineOption(strtol(echoBuffer, &endptr, 10)) == -1) {
+            break;
+        }
     }
 
     return 0;
@@ -81,10 +83,11 @@ int getUserList() {
         DieWithError("Error sending userList");
 
     for (int i = 0; i < userCount; i++) {
-        if (send(clntSocket, user[i].username, sizeof(user[i].username), 0) != sizeof(user[i].username))
-            DieWithError("Error sending userList");
-        printf("%s\n", user[i].username);
+        strcat(echoSend, user[i].username);
+        strcat(echoSend, "\n");
     }
+    if (send(clntSocket, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
+        DieWithError("Error sending userList");
     return 0;
 }
 
@@ -145,7 +148,6 @@ int determineOption(int option) {
             getMessages();
             break;
         case 4:
-            printf("User disconnected\n");
             return -1;
             break;
         case 5:

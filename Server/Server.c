@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     memset(&echoServAddr, 0, sizeof("127.0.0.1"));    /* Zero out structure */
     echoServAddr.sin_family = AF_INET;                /* Internet address family */
     echoServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    echoServAddr.sin_port = htons(8080);              /* Local port */
+    echoServAddr.sin_port = htons(echoServPort);      /* Local port */
 
     int opt = 1;
     if (setsockopt(servSock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0) {
@@ -41,23 +41,23 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* Bind to the local address */
     if (bind(servSock, (struct sockaddr *)&echoServAddr, sizeof(echoServAddr)) < 0)
         DieWithError("bind () failed");
+
     /* Mark the socket so it will listen for incoming connections */
     if (listen(servSock, MAXPENDING) < 0)
         DieWithError("listen() failed");
 
-    for (;;) { /* Run forever */
-        /* Set the size of the in-out parameter */
-        clntLen = sizeof(echoClntAddr);
-        /* Wait for a client to connect */
-        if ((clntSock = accept(servSock, (struct sockaddr *)&echoClntAddr, &clntLen)) < 0)
+    for (;;) { /* Bind to the local address */
+
+        /* Run forever */
+        clntLen = sizeof(echoClntAddr);                                                    /* Set the size of the in-out parameter */
+        if ((clntSock = accept(servSock, (struct sockaddr *)&echoClntAddr, &clntLen)) < 0) /* Wait for a client to connect */
             DieWithError("accept() failed");
-        /* clntSock is connected to a client! */
-        printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
+        printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr)); /* clntSock is connected to a client! */
         HandleTCPClient(clntSock);
         disconnect();
-        close(clntSock); /* Close client socket */
+        close(clntSock);
+        printf("User disconnected\n");
     }
 }
