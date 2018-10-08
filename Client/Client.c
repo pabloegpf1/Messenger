@@ -5,13 +5,13 @@
 #include <sys/socket.h> /* for socket(), connect(), send(), and recv() */
 #include <unistd.h>     /* for close() */
 
-#define RCVBUFSIZE 32 /* Size of receive buffer */
-#define MAXPENDING 5  /* Maximum outstanding connection requests */
+#define RCVBUFSIZE 100 /* Size of receive buffer */
+#define MAXPENDING 5   /* Maximum outstanding connection requests */
 
 int sock;                    /* Socket descriptor */
 char *echoString;            /* String to send to echo server */
 char echoBuffer[RCVBUFSIZE]; /* Buffer for echo string */
-char echoSend[100];
+char echoSend[RCVBUFSIZE];
 unsigned int echoStringLen;    /* Length of string to echo */
 int bytesRcvd, totalBytesRcvd; /* Bytes read in single recv() and total bytes read */
 int recvMsgSize;               /* Size of received message */
@@ -151,10 +151,9 @@ int getUserList() {
 }
 
 int startChat() {
-    close(sock);
     printf("\n------------------Disconnected from server------------------\n");
     printf("Please enter the port number you want to listen on: ");
-    fscanf(stdin, "%s", &echoBuffer);
+    scanf(" %s", &echoBuffer);
 
     echoServPort = atoi(echoBuffer);
     if ((servSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -190,20 +189,22 @@ int startChat() {
         clntSocket = socket;
 
         while (1) {
-            /* Receive message from client */
             if ((recvMsgSize = recv(clntSock, echoBuffer, RCVBUFSIZE, 0)) < 0)
                 DieWithError("recv() failed");
+
             printf("%s\n", echoBuffer);
 
             if (strcmp(echoBuffer, "Bye") == 0)
                 break;
+
+            memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
 
             printf("%s: ", username);
             scanf(" %[^\n]%*c", echoBuffer);
             strcat(echoSend, username);
             strcat(echoSend, ": ");
             strcat(echoSend, echoBuffer);
-            /* Send the string to the server */
+
             if (send(clntSock, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
                 DieWithError("Error sending option");
         }
@@ -242,26 +243,23 @@ int connectToChat() {
     printf("Connected!.....\n");
 
     while (1) {
-        memset(&echoSend, 0, sizeof(echoSend)); /* Zero out structure */
-        /* Send the string to the server */
+        memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
         printf("%s: ", username);
         scanf(" %[^\n]%*c", echoBuffer);
         strcat(echoSend, username);
         strcat(echoSend, ": ");
         strcat(echoSend, echoBuffer);
+
         if (send(sock, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
             DieWithError("Error sending message");
 
-        if (strcmp(echoBuffer, "Bye") == 0)
-            break;
-
         memset(echoBuffer, '\0', sizeof(echoBuffer) * sizeof(char));
 
-        /* Receive message from client */
         if ((recvMsgSize = recv(sock, echoBuffer, RCVBUFSIZE, 0)) < 0)
             DieWithError("recv() failed");
 
         printf("%s\n", echoBuffer);
+        if (strcmp(echoBuffer, "Bye") == 0) break;
     }
 
     return 0;

@@ -82,6 +82,7 @@ int getUserList() {
     if (send(clntSocket, echoBuffer, sizeof(echoBuffer), 0) != sizeof(echoBuffer))
         DieWithError("Error sending userList");
 
+    memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
     for (int i = 0; i < userCount; i++) {
         strcat(echoSend, user[i].username);
         strcat(echoSend, "\n");
