@@ -3,7 +3,7 @@
 #include <sys/socket.h> /* for recv() and send() */
 #include <unistd.h>     /* for close() */
 
-#define RCVBUFSIZE 32                  /* Size of receive buffer */
+#define RCVBUFSIZE 1000                /* Size of receive buffer */
 void DieWithError(char *errorMessage); /* Error handling function */
 const char username;
 const char password;
@@ -12,7 +12,7 @@ int found = -1;
 int userCount = 0;
 int clntSocket;
 char echoBuffer[RCVBUFSIZE]; /* Buffer for echo string */
-char echoSend[100];
+char echoSend[RCVBUFSIZE];
 int recvMsgSize; /* Size of received message */
 char *endptr;
 int online = 0;
@@ -69,6 +69,7 @@ int login() {
         printf("User %d created: %s\n", userCount, user[userCount].username);
         userCount++;
         actualUserIndex = userCount - 1;
+        user[userCount].messageCount = 0;
     }
 
     found = -1;
@@ -111,6 +112,7 @@ int sendMessage() {
         printf("Sending message to new user (%d) %s\n", userCount, user[userCount].username);
         found = userCount;
         userCount++;
+        user[userCount].messageCount = 0;
     }
 
     memset(echoBuffer, '\0', sizeof(echoBuffer) * sizeof(char));
@@ -118,19 +120,35 @@ int sendMessage() {
     if ((recvMsgSize = recv(clntSocket, echoBuffer, RCVBUFSIZE, 0)) < 0)
         DieWithError("recv() failed");
 
+    printf("-----Size of echoBuffer %d\n", strlen(echoBuffer));
+
     user[found].messages[user[found].messageCount] = malloc(strlen(echoBuffer) + 1);
     strcpy(user[found].messages[user[found].messageCount], echoBuffer);
 
     user[found].messageCount++;
+
+    for (int i = 0; i < user[found].messageCount; i++) {
+        printf(">(%i)%s\n", i, user[found].messages[i]);
+    }
+
     found = -1;
     return 0;
 }
 
 int getMessages() {
-    printf("Messages for %s:\n", user[actualUserIndex].username);
+    int pos = 0;
+
+    printf("Sending messages to %s\n", user[actualUserIndex].username);
+    memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
+
     for (int i = 0; i < user[actualUserIndex].messageCount; i++) {
-        printf("%s\n", user[actualUserIndex].messages[i]);
+        pos += sprintf(&echoSend[pos], "%s\n", user[actualUserIndex].messages[i]);
+        printf("%d%s\n", pos, user[actualUserIndex].messages[i]);
     }
+    printf("%s", echoSend);
+
+    if (send(clntSocket, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
+        DieWithError("Error sending userList");
     return 0;
 }
 

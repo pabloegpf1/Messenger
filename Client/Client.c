@@ -5,8 +5,8 @@
 #include <sys/socket.h> /* for socket(), connect(), send(), and recv() */
 #include <unistd.h>     /* for close() */
 
-#define RCVBUFSIZE 100 /* Size of receive buffer */
-#define MAXPENDING 5   /* Maximum outstanding connection requests */
+#define RCVBUFSIZE 1000 /* Size of receive buffer */
+#define MAXPENDING 5    /* Maximum outstanding connection requests */
 
 int sock;                    /* Socket descriptor */
 char *echoString;            /* String to send to echo server */
@@ -18,6 +18,7 @@ int recvMsgSize;               /* Size of received message */
 int online = -1;
 int userCount;
 int clntSocket;
+const char *last_three;
 
 int servSock;                    /* Socket descriptor for server */
 int clntSock;                    /* Socket descriptor for client */
@@ -39,7 +40,7 @@ int main(int argc, char *argv[]) {
         /*Display menu*/
         int option = -1;
         while (option < 0 || option > 5) {
-            printf("\n------------------\nCommand\n0. Connect to the server\n1. Get the user list\n2. Send a message\n3. Get my messages\n4. Initiate a chat with my friend\n5. Chat with my friend\nYour option<enter a number>:");
+            printf("\n-------------------------\nCommand\n0. Connect to the server\n1. Get the user list\n2. Send a message\n3. Get my messages\n4. Initiate a chat with my friend\n5. Chat with my friend\nYour option<enter a number>:");
             fscanf(stdin, "%d", &option);
             if (option < 0 || option > 5) {
                 printf("\nIncorrect Option!,try again:\n");
@@ -115,17 +116,39 @@ int sendMessage() {
     if (send(sock, "2", sizeof("2"), 0) != sizeof("2"))
         DieWithError("Error sending option");
 
+    memset(echoBuffer, '\0', sizeof(echoBuffer) * sizeof(char));
+
     printf("Send message to: ");
     fscanf(stdin, "%s", &echoBuffer);
 
     if (send(sock, echoBuffer, strlen(echoBuffer), 0) != strlen(echoBuffer))
         DieWithError("User not found");
 
+    memset(echoBuffer, '\0', sizeof(echoBuffer) * sizeof(char));
+    memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
+
     printf("Message: ");
     scanf(" %[^\n]%*c", echoBuffer);
+    strcat(echoSend, username);
+    strcat(echoSend, ": ");
+    strcat(echoSend, echoBuffer);
 
-    if (send(sock, echoBuffer, strlen(echoBuffer), 0) != strlen(echoBuffer))
+    if (send(sock, echoSend, RCVBUFSIZE, 0) != RCVBUFSIZE)
         DieWithError("Error sending message");
+
+    return 0;
+}
+
+int receiveMessage() {
+    if (send(sock, "3", sizeof("3"), 0) != sizeof("3"))
+        DieWithError("Error sending option");
+
+    memset(echoBuffer, '\0', sizeof(echoBuffer) * sizeof(char));
+    if ((recvMsgSize = recv(sock, echoBuffer, sizeof(echoBuffer), 0)) < 0)
+        DieWithError("recv() failed");
+
+    printf("\n-------Messages-------\n");
+    printf("%s\n", echoBuffer);
 
     return 0;
 }
@@ -139,12 +162,12 @@ int getUserList() {
         DieWithError("recv() failed");
 
     userCount = atoi(echoBuffer);
-
-    memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
     printf("\n-------UserList(%d)-------\n", userCount);
 
+    memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
     if ((recvMsgSize = recv(sock, echoSend, sizeof(echoSend), 0)) < 0)
         DieWithError("recv() failed");
+
     printf("%s", echoSend);
 
     return 0;
@@ -179,37 +202,39 @@ int startChat() {
 
     printf("I am listening on 127.0.0.1:%d\n", echoServPort);
 
+    /* Set the size of the in-out parameter */
+    clntLen = sizeof(echoClntAddr);
+    /* Wait for a client to connect */
+    if ((clntSock = accept(servSock, (struct sockaddr *)&echoClntAddr, &clntLen)) < 0)
+        DieWithError("accept() failed");
+
+    clntSocket = socket;
+
     while (1) {
-        /* Set the size of the in-out parameter */
-        clntLen = sizeof(echoClntAddr);
-        /* Wait for a client to connect */
-        if ((clntSock = accept(servSock, (struct sockaddr *)&echoClntAddr, &clntLen)) < 0)
-            DieWithError("accept() failed");
+        if ((recvMsgSize = recv(clntSock, echoBuffer, RCVBUFSIZE, 0)) < 0)
+            DieWithError("recv() failed");
 
-        clntSocket = socket;
+        printf("%s\n", echoBuffer);
 
-        while (1) {
-            if ((recvMsgSize = recv(clntSock, echoBuffer, RCVBUFSIZE, 0)) < 0)
-                DieWithError("recv() failed");
+        last_three = &echoBuffer[strlen(echoBuffer) - 3];
+        if (strcmp(last_three, "Bye") == 0) break;
 
-            printf("%s\n", echoBuffer);
+        memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
 
-            if (strcmp(echoBuffer, "Bye") == 0)
-                break;
+        printf("%s: ", username);
+        scanf(" %[^\n]%*c", echoBuffer);
+        strcat(echoSend, username);
+        strcat(echoSend, ": ");
+        strcat(echoSend, echoBuffer);
 
-            memset(echoSend, '\0', sizeof(echoSend) * sizeof(char));
+        if (send(clntSock, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
+            DieWithError("Error sending option");
 
-            printf("%s: ", username);
-            scanf(" %[^\n]%*c", echoBuffer);
-            strcat(echoSend, username);
-            strcat(echoSend, ": ");
-            strcat(echoSend, echoBuffer);
-
-            if (send(clntSock, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
-                DieWithError("Error sending option");
-        }
+        last_three = &echoSend[strlen(echoSend) - 3];
+        if (strcmp(last_three, "Bye") == 0) break;
     }
     return 0;
+    close(clntSock);
 }
 
 int connectToChat() {
@@ -253,15 +278,20 @@ int connectToChat() {
         if (send(sock, echoSend, sizeof(echoSend), 0) != sizeof(echoSend))
             DieWithError("Error sending message");
 
+        last_three = &echoSend[strlen(echoSend) - 3];
+        if (strcmp(last_three, "Bye") == 0) break;
+
         memset(echoBuffer, '\0', sizeof(echoBuffer) * sizeof(char));
 
         if ((recvMsgSize = recv(sock, echoBuffer, RCVBUFSIZE, 0)) < 0)
             DieWithError("recv() failed");
 
         printf("%s\n", echoBuffer);
-        if (strcmp(echoBuffer, "Bye") == 0) break;
-    }
 
+        last_three = &echoBuffer[strlen(echoBuffer) - 3];
+        if (strcmp(last_three, "Bye") == 0) break;
+    }
+    close(sock);
     return 0;
 }
 
@@ -277,15 +307,14 @@ int determineOption(int option) {
             sendMessage();
             break;
         case 3:
-            if (send(sock, "3", sizeof("3"), 0) != sizeof("3"))
-                DieWithError("Error sending option");
+            receiveMessage();
             break;
         case 4:
             send(sock, "4", sizeof("4"), 0) != sizeof("4");
             startChat();
             break;
         case 5:
-            send(sock, "4", sizeof("4"), 0) != sizeof("4");
+            send(sock, "5", sizeof("5"), 0) != sizeof("5");
             connectToChat();
             break;
     }
