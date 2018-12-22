@@ -1,5 +1,6 @@
 # Messenger
-Client - Server messaging app 
+Client - Server messaging app using Socket programming
+
 Class project for csc648 at San Francisco State University.
 
 ## How to run
