@@ -1,7 +1,7 @@
 # Messenger
 Client - Server messaging app using Socket programming
 
-Class project for csc648 at San Francisco State University.
+Class project for csc645 (Computer Networks) at San Francisco State University.
 
 ## How to run
 * Clone the repository
